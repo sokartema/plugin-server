@@ -1,6 +1,7 @@
 var express = require('express');
 var app = express();
 var bodyParser = require('body-parser');
+var loader = require('./loader');
 
 
 app.use(bodyParser.json()); // support json encoded bodies
@@ -15,29 +16,64 @@ app.use(function(req, res, next) {
 app.post('/', function(req, res) {
     var codeValidation = req.body.codeValidation;
     var textSolution = req.body.textSolution;
+    var language = req.body.language;
 
-    try{
+    console.log("Code Validation: " + codeValidation);
+    console.log("Text Solution: " + textSolution);
+    console.log("Language: " + language);
 
-      eval('var test = '+ codeValidation);
+    var respuesta = null;
 
-    }catch(e){
+    var error = false;
 
-      console.log('Function error = '+ e);
+
+    switch (language) {
+      case "javascript":
+
+          loader.js.execute(codeValidation, textSolution, res);
+
+        break;
+
+      case "ruby":
+
+          loader.ruby.execute(codeValidation, textSolution, res);
+
+
+        break;
+
+      case "python":
+
+          loader.python.execute(codeValidation, textSolution , res);
+
+        break;
+
+      case "java":
+
+          loader.java.execute(codeValidation, textSolution , res);
+
+        break;
+
+      default:
+
+        error = true;
+        respuesta = "Unexpected language";
 
     }
 
-    var respuesta = test(textSolution);
+    if(error){
 
-    console.log(respuesta);
+      console.log("Respuesta: " + respuesta);
 
-    obj = {"respuesta": respuesta};
+      obj = {"respuesta": respuesta};
 
-    res.json(JSON.stringify(obj));
+      res.status(500).send(respuesta);
+    }
+
 });
 
 app.get('/', function(req, res) {
-    console.log(req);
-    res.json(JSON.stringify(obj));
+
+    res.send("En get no hay nada :(");
 });
 
 
