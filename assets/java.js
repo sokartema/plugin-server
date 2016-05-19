@@ -30,7 +30,7 @@ module.exports = {
 
     var string = stringBuilder(codeValidation,textSolution,nameFile);
 
-    function uno(){
+    (function(){
 
       var d = Q.defer();
 
@@ -44,9 +44,9 @@ module.exports = {
 
       });
       return d.promise;
-    }
 
-    function dos(){
+    })().then(function(){
+
       var d = Q.defer();
 
       execFile('javac', ['./files/java/'+ nameFile +'.java'], (err, stdout, stderr) => {
@@ -62,9 +62,7 @@ module.exports = {
 
       return d.promise;
 
-    }
-
-    function tres(){
+    }).then(function(){
 
       var d = Q.defer();
 
@@ -97,16 +95,11 @@ module.exports = {
 
       });
 
-    }
-
-    uno()
-    .then(dos)
-    .then(tres)
+    })
     .fail(function(error){
 
       console.log(error);
-      var obj = {"respuesta": error};
-      res.status(500).send(obj);
+      res.status(500).send({"respuesta": error});
 
     })
     .done();
