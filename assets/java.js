@@ -6,15 +6,6 @@ var Q = require('q');
 
 shortid.characters('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$');
 
-function errorHandler(msg, res){
-
-  console.log(msg);
-  var obj = {"respuesta": msg};
-  res.status(500).send(obj);
-
-
-}
-
 function stringBuilder(codeValidation,textSolution,nameFile){
 
   var string = "package files.java;"+
@@ -40,6 +31,7 @@ module.exports = {
     var string = stringBuilder(codeValidation,textSolution,nameFile);
 
     function uno(){
+      
       var d = Q.defer();
 
       fs.writeFile('./files/java/'+ nameFile +'.java', string, (err) => {
@@ -78,7 +70,7 @@ module.exports = {
 
       console.log("Executing: " + nameFile + ".class");
 
-      execFile('java',['./files/java/'+ nameFile], (err, stdout, stderr) => {
+      execFile('java',['files/java/'+ nameFile], (err, stdout, stderr) => {
         if (err){
           d.reject(new Error(err));
         }else{
@@ -107,8 +99,8 @@ module.exports = {
     }
 
     uno()
-    .then(dos())
-    .then(tres())
+    .then(dos)
+    .then(tres)
     .catch(function(error){
 
       console.log(error);

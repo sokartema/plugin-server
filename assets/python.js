@@ -1,6 +1,7 @@
 var fs = require('fs');
 var shortid = require('shortid');
 var execFile = require('child_process').execFile;
+var Q = require('q');
 
 function errorHandler(msg, res){
 
