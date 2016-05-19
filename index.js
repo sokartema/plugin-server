@@ -66,7 +66,7 @@ app.post('/', function(req, res) {
 
       obj = {"respuesta": respuesta};
 
-      res.status(500).send(respuesta);
+      res.status(500).send(obj);
     }
 
 });

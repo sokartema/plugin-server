@@ -4,8 +4,9 @@ var execFile = require('child_process').execFile;
 
 function errorHandler(msg, res){
 
-  var obj = {"respuesta": e};
-  res.status(500).send(respuesta);
+  console.log(msg);
+  var obj = {"respuesta": msg};
+  res.status(500).send(obj);
 
 }
 
@@ -34,7 +35,7 @@ module.exports = {
         resolve();
 
       });
-    }).then(function(resolve,reject){
+    }).then(function(resolve){
 
       console.log("Executing: " + nameFile + ".py");
 
@@ -59,7 +60,7 @@ module.exports = {
     }).catch(function(e) {
 
       var obj = {"respuesta": e};
-      res.status(500).send(respuesta);
+      res.status(500).send(obj);
 
     });
   }

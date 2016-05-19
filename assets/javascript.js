@@ -25,8 +25,8 @@ module.exports = {
       res.json(JSON.stringify(obj));
 
     }else{
-
-      res.status(500).send(respuesta);
+      
+      res.status(500).send(obj);
     }
 
   }
