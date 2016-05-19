@@ -31,12 +31,12 @@ module.exports = {
     var string = stringBuilder(codeValidation,textSolution,nameFile);
 
     function uno(){
-      
+
       var d = Q.defer();
 
       fs.writeFile('./files/java/'+ nameFile +'.java', string, (err) => {
         if (err){
-          d.reject(new Error(err));
+          d.reject(err);
         }else{
           console.log("Created file: " + nameFile + ".java");
           d.resolve();
@@ -51,7 +51,7 @@ module.exports = {
 
       execFile('javac', ['./files/java/'+ nameFile +'.java'], (err, stdout, stderr) => {
         if (err){
-          d.reject(new Error(err));
+          d.reject(err);
         }else{
 
           console.log("Created file: " + nameFile + ".class");
@@ -72,7 +72,7 @@ module.exports = {
 
       execFile('java',['files/java/'+ nameFile], (err, stdout, stderr) => {
         if (err){
-          d.reject(new Error(err));
+          d.reject(err);
         }else{
 
           console.log("Respuesta: "+ stdout);
@@ -88,6 +88,7 @@ module.exports = {
 
           fs.unlink('./files/java/'+ nameFile +'.class');
 
+
           d.resolve();
 
 
@@ -101,7 +102,7 @@ module.exports = {
     uno()
     .then(dos)
     .then(tres)
-    .catch(function(error){
+    .fail(function(error){
 
       console.log(error);
       var obj = {"respuesta": error};
