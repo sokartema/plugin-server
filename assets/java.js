@@ -55,6 +55,10 @@ module.exports = {
         }else{
 
           console.log("Created file: " + nameFile + ".class");
+
+          console.log("Borrando archivo: " + nameFile + ".java");
+
+          fs.unlink('./files/java/'+ nameFile +'.java');
           d.resolve();
 
         }
@@ -77,10 +81,6 @@ module.exports = {
           var obj = {"respuesta":stdout.trim()};
 
           res.json(JSON.stringify(obj));
-
-          console.log("Borrando archivo: " + nameFile + ".java");
-
-          fs.unlink('./files/java/'+ nameFile +'.java');
 
           console.log("Borrando archivo: " + nameFile + ".class");
 
