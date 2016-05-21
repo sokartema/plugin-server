@@ -55,7 +55,7 @@ app.post('/', function(req, res) {
       case "c++":
 
           loader.cpp.execute(codeValidation, textSolution , res);
-          
+
       break;
 
       default:
@@ -80,6 +80,6 @@ app.get('/', function(req, res) {
 });
 
 
-app.listen(8888);
+app.listen(process.env.PORT || 8888);
 
 console.log("Server Listening on 8888");
