@@ -1,33 +1,73 @@
+var fs = require('fs');
+var shortid = require('shortid');
+var execFile = require('child_process').execFile;
+var Q = require('q');
+
+
+function stringBuilder(codeValidation,textSolution){
+
+  var string = "var text = \""+ textSolution + "\";\n"+ codeValidation + "\nconsole.log(exercise(text))";
+
+  return string;
+}
+
+
 module.exports = {
 
-  execute: function(codeValidation,textSolution,res ){
+  execute: function(codeValidation,textSolution, res){
 
-    var error = false;
+    var nameFile = shortid.generate();
 
-    try{
+    var string = stringBuilder(codeValidation,textSolution);
 
-      eval('var test = '+ codeValidation);
+        (function(){
+          var d = Q.defer();
 
-    }catch(e){
+           fs.writeFile('./files/javascript/'+ nameFile +'.js', string, (err) => {
+            if (err)
+                d.reject(err);
 
-      var respuesta = "Function error: " + e;
+            console.log("Created file: " + nameFile + ".js");
+            d.resolve();
 
-    }
+          });
 
-    var respuesta = test(textSolution);
+          return d.promise;
 
-    console.log("Respuesta: " + respuesta);
+        })().then(function(){
 
-    var obj = {"respuesta":respuesta};
+          var d = Q.defer();
 
-    if(!error){
+          console.log("Executing: " + nameFile + ".js");
 
-      res.json(JSON.stringify(obj));
+          execFile('node', ['./files/javascript/'+ nameFile +'.js'], (err, stdout, stderr) => {
+            if (err){
 
-    }else{
-      
-      res.status(500).send(obj);
-    }
+              console.log("Borrando archivo: " + nameFile + ".js");
+
+              fs.unlink('./files/javascript/'+ nameFile +'.js');
+              d.reject(stderr);
+            }else{
+
+              console.log("Respuesta: "+ stdout);
+
+              res.json(JSON.stringify({"respuesta":stdout.trim()}));
+
+              console.log("Borrando archivo: " + nameFile + ".js");
+
+              fs.unlink('./files/javascript/'+ nameFile +'.js');
+
+            }
+
+          });
+
+          return d.promise;
+
+        }).catch(function(e) {
+
+          res.status(500).send({"respuesta": e});
+
+        }).done();
 
   }
 

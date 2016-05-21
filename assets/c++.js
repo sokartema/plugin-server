@@ -3,20 +3,18 @@ var shortid = require('shortid');
 var execFile = require('child_process').execFile;
 var Q = require('q');
 
-
-shortid.characters('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$');
-
 function stringBuilder(codeValidation,textSolution,nameFile){
 
-  var string = "package files.java;"+
-  "class "+nameFile+" {\n"+
-  " public static void main(String args[]) {\n"+
-    "   String text = \""+ textSolution + "\";\n" +
-    "   System.out.print(exercise(text));\n"+
-  " }\n"+
+  var string = "#include <iostream>\n"+
+  "#include <regex>\n"+
+  "#include <string>\n"+
+  "using namespace std;\n"+
   codeValidation+ "\n"+
-"}";
-
+  " int main(int argc, const char * argv[]) {\n"+
+    "   string text = \""+ textSolution + "\";\n" +
+    "   cout << exercise(text);\n" +
+    "   return 0;\n" +
+  " }";
 
   return string;
 }
@@ -34,11 +32,11 @@ module.exports = {
 
       var d = Q.defer();
 
-      fs.writeFile('./files/java/'+ nameFile +'.java', string, (err) => {
+      fs.writeFile('./files/c++/'+ nameFile +'.cpp', string, (err) => {
         if (err){
           d.reject(err);
         }else{
-          console.log("Created file: " + nameFile + ".java");
+          console.log("Created file: " + nameFile + ".cpp");
           d.resolve();
         }
 
@@ -49,19 +47,19 @@ module.exports = {
 
       var d = Q.defer();
 
-      execFile('javac', ['./files/java/'+ nameFile +'.java'], (err, stdout, stderr) => {
+      execFile('g++', ['files/c++/'+ nameFile +'.cpp -o files/c++/'+ nameFile], (err, stdout, stderr) => {
         if (err){
 
-          console.log("Borrando archivo: " + nameFile + ".java");
-          fs.unlink('./files/java/'+ nameFile +'.java');
+          console.log("Borrando archivo: " + nameFile + ".cpp");
+          //fs.unlink('./files/c++/'+ nameFile +'.cpp');
           d.reject(stderr);
         }else{
 
-          console.log("Created file: " + nameFile + ".class");
+          console.log("Created file: " + nameFile);
 
-          console.log("Borrando archivo: " + nameFile + ".java");
+          console.log("Borrando archivo: " + nameFile + ".cpp");
 
-          fs.unlink('./files/java/'+ nameFile +'.java');
+          //fs.unlink('./files/c++/'+ nameFile +'.cpp');
           d.resolve();
 
         }
@@ -73,14 +71,14 @@ module.exports = {
 
       var d = Q.defer();
 
-      console.log("Executing: " + nameFile + ".class");
+      console.log("Executing: " + nameFile);
 
-      execFile('java',['files/java/'+ nameFile], (err, stdout, stderr) => {
+      execFile('./'+namefile , (err, stdout, stderr) => {
         if (err){
 
-          console.log("Borrando archivo: " + nameFile + ".class");
+          console.log("Borrando archivo: " + nameFile);
 
-          fs.unlink('./files/java/'+ nameFile +'.class');
+          //fs.unlink('./files/c++/'+ nameFile);
 
           d.reject(stderr);
         }else{
@@ -89,9 +87,9 @@ module.exports = {
 
           res.json(JSON.stringify({"respuesta":stdout.trim()}));
 
-          console.log("Borrando archivo: " + nameFile + ".class");
+          console.log("Borrando archivo: " + nameFile);
 
-          fs.unlink('./files/java/'+ nameFile +'.class');
+          //fs.unlink('./files/c++/'+ nameFile);
 
 
           d.resolve();

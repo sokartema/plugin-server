@@ -3,14 +3,6 @@ var shortid = require('shortid');
 var execFile = require('child_process').execFile;
 var Q = require('q');
 
-function errorHandler(msg, res){
-
-  console.log(msg);
-  var obj = {"respuesta": msg};
-  res.status(500).send(obj);
-
-}
-
 
 function stringBuilder(codeValidation,textSolution){
 
@@ -28,42 +20,54 @@ module.exports = {
 
     var string = stringBuilder(codeValidation,textSolution);
 
-    new Promise(function(resolve,reject){ fs.writeFile('./files/python/'+ nameFile +'.py', string, (err) => {
+    (function(){
+      var d = Q.defer();
+
+       fs.writeFile('./files/python/'+ nameFile +'.py', string, (err) => {
         if (err)
-            reject(err);
+            d.reject(err);
 
         console.log("Created file: " + nameFile + ".py");
-        resolve();
+        d.resolve();
 
       });
-    }).then(function(resolve){
+
+      return d.promise;
+
+    })().then(function(){
+
+      var d = Q.defer();
 
       console.log("Executing: " + nameFile + ".py");
 
       execFile('python', ['./files/python/'+ nameFile +'.py'], (err, stdout, stderr) => {
         if (err){
-          errorHandler(err, res);
+
+          console.log("Borrando archivo: " + nameFile + ".py");
+
+          fs.unlink('./files/python/'+ nameFile +'.py');
+          d.reject(stderr);
         }else{
 
           console.log("Respuesta: "+ stdout);
-          var obj = {"respuesta":stdout.trim()};
 
-          res.json(JSON.stringify(obj));
+          res.json(JSON.stringify({"respuesta":stdout.trim()}));
+
+          console.log("Borrando archivo: " + nameFile + ".py");
+
+          fs.unlink('./files/python/'+ nameFile +'.py');
 
         }
 
-        console.log("Borrando archivo: " + nameFile + ".py");
-
-        fs.unlink('./files/python/'+ nameFile +'.py');
-
       });
+
+      return d.promise;
 
     }).catch(function(e) {
 
-      var obj = {"respuesta": e};
-      res.status(500).send(obj);
+      res.status(500).send({"respuesta": e});
 
-    });
+    }).done();
   }
 
 };

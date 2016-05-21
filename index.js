@@ -52,6 +52,11 @@ app.post('/', function(req, res) {
           loader.java.execute(codeValidation, textSolution , res);
 
         break;
+      case "c++":
+
+          loader.cpp.execute(codeValidation, textSolution , res);
+          
+      break;
 
       default:
 
@@ -64,9 +69,7 @@ app.post('/', function(req, res) {
 
       console.log("Respuesta: " + respuesta);
 
-      obj = {"respuesta": respuesta};
-
-      res.status(500).send(obj);
+      res.status(500).send({"respuesta": respuesta});
     }
 
 });

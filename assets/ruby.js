@@ -1,17 +1,7 @@
 var fs = require('fs');
 var shortid = require('shortid');
 var execFile = require('child_process').execFile;
-
-
-function errorHandler(msg, res){
-
-
-  console.log(msg);
-  var obj = {"respuesta": msg};
-  res.status(500).send(obj);
-
-
-}
+var Q = require('q');
 
 
 function stringBuilder(codeValidation,textSolution){
@@ -21,8 +11,6 @@ function stringBuilder(codeValidation,textSolution){
   return string;
 }
 
-
-
 module.exports = {
 
   execute: function(codeValidation,textSolution, res){
@@ -31,43 +19,58 @@ module.exports = {
 
     var string = stringBuilder(codeValidation,textSolution);
 
-    new Promise(function(resolve,reject){ fs.writeFile('./files/ruby/'+ nameFile +'.rb', string, (err) => {
+    (function(){
+
+        var d = Q.defer();
+
+      fs.writeFile('./files/ruby/'+ nameFile +'.rb', string, (err) => {
         if (err)
-            reject(err);
+          d.reject(err);
 
         console.log("Created file: " + nameFile + ".rb");
-        resolve();
+        d.resolve();
 
       });
-    }).then(function(resolve){
+
+      return d.promise;
+
+    })().then(function(resolve){
+
+      var d = Q.defer();
 
       console.log("Executing: " + nameFile + ".rb");
 
       execFile('ruby', ['./files/ruby/'+ nameFile +'.rb'], (err, stdout, stderr) => {
         if (err){
-          errorHandler(err, res);
+          d.reject(stderr);
+          console.log("Borrando archivo: " + nameFile + ".rb");
+
+          fs.unlink('./files/ruby/'+ nameFile +'.rb');
+
         }else{
 
 
-        console.log("Respuesta: "+ stdout);
-        var obj = {"respuesta":stdout.trim()};
+          console.log("Respuesta: "+ stdout);
 
-        res.json(JSON.stringify(obj));
+          res.json(JSON.stringify({"respuesta":stdout.trim()}));
+
+          console.log("Borrando archivo: " + nameFile + ".rb");
+
+          fs.unlink('./files/ruby/'+ nameFile +'.rb');
+
+          d.resolve();
 
         }
 
-        console.log("Borrando archivo: " + nameFile + ".rb");
-
-        fs.unlink('./files/ruby/'+ nameFile +'.rb');
-
       });
+
+      return d.promise;
 
     }).catch(function(e) {
 
-      var obj = {"respuesta": e};
-      res.status(500).send(obj);
+      res.status(500).send({"respuesta": e});
 
-    });
+    }).done();
   }
 
 };
