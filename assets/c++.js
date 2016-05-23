@@ -47,11 +47,11 @@ module.exports = {
 
       var d = Q.defer();
 
-      execFile('g++', ['files/c++/'+ nameFile +'.cpp -o files/c++/'+ nameFile], (err, stdout, stderr) => {
+      execFile('g++', ['files/c++/'+ nameFile +'.cpp', '-o' ,'files/c++/'+ nameFile], (err, stdout, stderr) => {
         if (err){
 
           console.log("Borrando archivo: " + nameFile + ".cpp");
-          //fs.unlink('./files/c++/'+ nameFile +'.cpp');
+          fs.unlink('./files/c++/'+ nameFile +'.cpp');
           d.reject(stderr);
         }else{
 
@@ -59,7 +59,7 @@ module.exports = {
 
           console.log("Borrando archivo: " + nameFile + ".cpp");
 
-          //fs.unlink('./files/c++/'+ nameFile +'.cpp');
+          fs.unlink('./files/c++/'+ nameFile +'.cpp');
           d.resolve();
 
         }
@@ -73,23 +73,31 @@ module.exports = {
 
       console.log("Executing: " + nameFile);
 
-      execFile('./'+namefile , (err, stdout, stderr) => {
+      execFile('./files/c++/'+nameFile , (err, stdout, stderr) => {
         if (err){
 
           console.log("Borrando archivo: " + nameFile);
 
-          //fs.unlink('./files/c++/'+ nameFile);
+          fs.unlink('./files/c++/'+ nameFile);
 
           d.reject(stderr);
         }else{
 
           console.log("Respuesta: "+ stdout);
 
+          if(stdout === '1'){
+            stdout = "true";
+          }
+
+          if(stdout === '0'){
+            stdout = "false";
+          }
+
           res.json(JSON.stringify({"respuesta":stdout.trim()}));
 
           console.log("Borrando archivo: " + nameFile);
 
-          //fs.unlink('./files/c++/'+ nameFile);
+          fs.unlink('./files/c++/'+ nameFile);
 
 
           d.resolve();
