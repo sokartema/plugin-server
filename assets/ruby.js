@@ -1,19 +1,28 @@
 var fs = require('fs');
+var path = require('path');
 var shortid = require('shortid');
 var execFile = require('child_process').execFile;
 var Q = require('q');
+var node_ssh = require('node-ssh');
+var util = require('util');
+var config = require('../config.json');
 
+shortid.characters('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-');
 
 function stringBuilder(codeValidation,textSolution){
 
-  var string = "text = \""+ textSolution + "\"\n"+ codeValidation + "\nputs exercise(text)";
+  var string = "text = \""+ util.inspect(textSolution).replace(/^'|'$/g, '').replace(/"/g, '\\"') + "\"\n"+ codeValidation + "\nputs exercise(text)";
 
   return string;
 }
 
 module.exports = {
 
-  execute: function(codeValidation,textSolution, res){
+  execute: function(codeValidation,textSolution, res , server){
+
+    var ssh = new node_ssh();
+
+    console.log("Server: " + server);
 
     var nameFile = shortid.generate();
 
@@ -34,35 +43,76 @@ module.exports = {
 
       return d.promise;
 
-    })().then(function(resolve){
+    })().then(function(){
 
       var d = Q.defer();
 
-      console.log("Executing: " + nameFile + ".rb");
+        ssh.connect({
+          host: server,
+          username: config.user,
+          password: config.password
 
-      execFile('ruby', ['./files/ruby/'+ nameFile +'.rb'], (err, stdout, stderr) => {
-        if (err){
-          d.reject(stderr);
-          console.log("Borrando archivo: " + nameFile + ".rb");
+        }).then(function(){
 
-          fs.unlink('./files/ruby/'+ nameFile +'.rb');
+          var z = Q.defer();
 
-        }else{
+          ssh.put(path.dirname(require.main.filename) + '/files/ruby/'+ nameFile +'.rb', 'files/ruby/'+ nameFile +'.rb').then(function() {
+              console.log('Uploaded File '+nameFile +'.rb');
+              z.resolve();
+          }, function(error) {
 
+              console.log(error);
+              z.reject(error);
+          });
 
-          console.log("Respuesta: "+ stdout);
+          return z.promise;
 
-          res.json(JSON.stringify({"respuesta":stdout.trim()}));
+        }).then(function(){
 
-          console.log("Borrando archivo: " + nameFile + ".rb");
+            var z = Q.defer();
 
-          fs.unlink('./files/ruby/'+ nameFile +'.rb');
+          ssh.execCommand('ruby files/ruby/'+ nameFile +'.rb',{stream: 'both'}).then(function(result) {
 
-          d.resolve();
+            if(result.stderr !== ''){
 
-        }
+              z.reject(result.stderr);
+            }else{
+              console.log("Respuesta: "+ result.stdout);
+              res.json(JSON.stringify({"respuesta": result.stdout.trim()}));
+              z.resolve();
+            }
 
-      });
+          });
+
+          return z.promise;
+
+        }).then(function(){
+
+            var z = Q.defer();
+
+          ssh.execCommand('rm -f files/ruby/'+ nameFile +'.rb').then(function(result) {
+            console.log('Borrado archivo en el servidor');
+            console.log('Borrando archivo local');
+            fs.unlink('./files/ruby/'+ nameFile +'.rb');
+            z.resolve();
+            d.resolve();
+          });
+
+          return z.promise;
+
+        }).catch(function(e){
+
+          ssh.execCommand('rm -f files/ruby/'+ nameFile +'.rb').then(function(result) {
+            console.log('Borrado archivo en el servidor');
+            console.log('Borrando archivo local');
+            fs.unlink('./files/ruby/'+ nameFile +'.rb');
+            z.resolve();
+            d.resolve();
+          });
+
+          d.reject(e);
+
+        });
 
       return d.promise;
 

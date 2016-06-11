@@ -1,12 +1,17 @@
 var fs = require('fs');
+var path = require('path');
 var shortid = require('shortid');
 var execFile = require('child_process').execFile;
 var Q = require('q');
+var node_ssh = require('node-ssh');
+var util = require('util');
+var config = require('../config.json');
 
+shortid.characters('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-');
 
 function stringBuilder(codeValidation,textSolution){
 
-  var string = "var text = \""+ textSolution + "\";\n"+ codeValidation + "\nconsole.log(exercise(text))";
+  var string = "var text = \""+ util.inspect(textSolution).replace(/^'|'$/g, '').replace(/"/g, '\\"') + "\";\n"+ codeValidation + "\nconsole.log(exercise(text))";
 
   return string;
 }
@@ -14,7 +19,11 @@ function stringBuilder(codeValidation,textSolution){
 
 module.exports = {
 
-  execute: function(codeValidation,textSolution, res){
+  execute: function(codeValidation,textSolution, res, server){
+
+    var ssh = new node_ssh();
+
+    console.log("Server: " + server);
 
     var nameFile = shortid.generate();
 
@@ -38,30 +47,74 @@ module.exports = {
 
           var d = Q.defer();
 
-          console.log("Executing: " + nameFile + ".js");
+          ssh.connect({
+            host: server,
+            username: config.user,
+            password: config.password
 
-          execFile('node', ['./files/javascript/'+ nameFile +'.js'], (err, stdout, stderr) => {
-            if (err){
+          }).then(function(){
 
-              console.log("Borrando archivo: " + nameFile + ".js");
+            var z = Q.defer();
 
+            ssh.put(path.dirname(require.main.filename) + '/files/javascript/'+ nameFile +'.js', 'files/javascript/'+ nameFile +'.js').then(function() {
+                console.log('Uploaded File '+nameFile +'.js');
+                z.resolve();
+            }, function(error) {
+
+                console.log(error);
+                z.reject(error);
+            });
+
+            return z.promise;
+
+          }).then(function(){
+
+              var z = Q.defer();
+
+            ssh.execCommand('node files/javascript/'+ nameFile +'.js',{stream: 'both'}).then(function(result) {
+
+              if(result.stderr !== ''){
+
+                z.reject(result.stderr);
+              }else{
+                console.log("Respuesta: "+ result.stdout);
+                res.json(JSON.stringify({"respuesta": result.stdout.trim()}));
+                z.resolve();
+              }
+
+            });
+
+            return z.promise;
+
+          }).then(function(){
+
+              var z = Q.defer();
+
+            ssh.execCommand('rm -f files/javascript/'+ nameFile +'.js').then(function(result) {
+              console.log('Borrado archivo en el servidor');
+              console.log('Borrando archivo local');
               fs.unlink('./files/javascript/'+ nameFile +'.js');
-              d.reject(stderr);
-            }else{
+              z.resolve();
+              d.resolve();
+            });
 
-              console.log("Respuesta: "+ stdout);
+            return z.promise;
 
-              res.json(JSON.stringify({"respuesta":stdout.trim()}));
+          }).catch(function(e){
 
-              console.log("Borrando archivo: " + nameFile + ".js");
-
+            ssh.execCommand('rm -f files/javascript/'+ nameFile +'.js').then(function(result) {
+              console.log('Borrado archivo en el servidor');
+              console.log('Borrando archivo local');
               fs.unlink('./files/javascript/'+ nameFile +'.js');
+              z.resolve();
+              d.resolve();
+            });
 
-            }
+            d.reject(e);
 
           });
 
-          return d.promise;
+        return d.promise;
 
         }).catch(function(e) {
 

@@ -1,12 +1,17 @@
 var fs = require('fs');
+var path = require('path');
 var shortid = require('shortid');
 var execFile = require('child_process').execFile;
 var Q = require('q');
+var node_ssh = require('node-ssh');
+var util = require('util');
+var config = require('../config.json');
 
+shortid.characters('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-');
 
 function stringBuilder(codeValidation,textSolution){
 
-  var string = "text = \""+ textSolution + "\"\n"+ codeValidation + "\nprint exercise(text)";
+  var string = "text = \""+ util.inspect(textSolution).replace(/^'|'$/g, '').replace(/"/g, '\\"') + "\"\n"+ codeValidation + "\nprint exercise(text)";
 
   return string;
 }
@@ -14,7 +19,11 @@ function stringBuilder(codeValidation,textSolution){
 
 module.exports = {
 
-  execute: function(codeValidation,textSolution, res){
+  execute: function(codeValidation,textSolution, res , server){
+
+    var ssh = new node_ssh();
+
+    console.log("Server: " + server);
 
     var nameFile = shortid.generate();
 
@@ -38,30 +47,75 @@ module.exports = {
 
       var d = Q.defer();
 
-      console.log("Executing: " + nameFile + ".py");
+              ssh.connect({
+                host: server,
+                username: config.user,
+                password: config.password
 
-      execFile('python', ['./files/python/'+ nameFile +'.py'], (err, stdout, stderr) => {
-        if (err){
+              }).then(function(){
 
-          console.log("Borrando archivo: " + nameFile + ".py");
+                var z = Q.defer();
 
-          fs.unlink('./files/python/'+ nameFile +'.py');
-          d.reject(stderr);
-        }else{
+                ssh.put(path.dirname(require.main.filename) + '/files/python/'+ nameFile +'.py', 'files/python/'+ nameFile +'.py').then(function() {
+                    console.log('Uploaded File '+nameFile +'.py');
+                    z.resolve();
+                }, function(error) {
 
-          console.log("Respuesta: "+ stdout);
+                    console.log(error);
+                    z.reject(error);
+                });
 
-          res.json(JSON.stringify({"respuesta":stdout.trim()}));
+                return z.promise;
 
-          console.log("Borrando archivo: " + nameFile + ".py");
+              }).then(function(){
 
-          fs.unlink('./files/python/'+ nameFile +'.py');
+                  var z = Q.defer();
 
-        }
+                ssh.execCommand('python files/python/'+ nameFile +'.py',{stream: 'both'}).then(function(result) {
 
-      });
+                  if(result.stderr !== ''){
 
-      return d.promise;
+                    z.reject(result.stderr);
+                  }else{
+                    console.log("Respuesta: "+ result.stdout);
+                    res.json(JSON.stringify({"respuesta": result.stdout.trim()}));
+                    z.resolve();
+                  }
+
+                });
+
+                return z.promise;
+
+              }).then(function(){
+
+                  var z = Q.defer();
+
+                ssh.execCommand('rm -f files/python/'+ nameFile +'.py').then(function(result) {
+                  console.log('Borrado archivo en el servidor');
+                  console.log('Borrando archivo local');
+                  fs.unlink('./files/python/'+ nameFile +'.py');
+                  z.resolve();
+                  d.resolve();
+                });
+
+                return z.promise;
+
+              }).catch(function(e){
+
+                ssh.execCommand('rm -f files/python/'+ nameFile +'.py').then(function(result) {
+                  console.log('Borrado archivo en el servidor');
+                  console.log('Borrando archivo local');
+                  fs.unlink('./files/python/'+ nameFile +'.py');
+                  z.resolve();
+                  d.resolve();
+                });
+
+                d.reject(e);
+
+              });
+
+            return d.promise;
+
 
     }).catch(function(e) {
 

@@ -1,7 +1,13 @@
 var fs = require('fs');
+var path = require('path');
 var shortid = require('shortid');
 var execFile = require('child_process').execFile;
 var Q = require('q');
+var node_ssh = require('node-ssh');
+var util = require('util');
+var config = require('../config.json');
+
+shortid.characters('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-');
 
 function stringBuilder(codeValidation,textSolution,nameFile){
 
@@ -11,7 +17,7 @@ function stringBuilder(codeValidation,textSolution,nameFile){
   "using namespace std;\n"+
   codeValidation+ "\n"+
   " int main(int argc, const char * argv[]) {\n"+
-    "   string text = \""+ textSolution + "\";\n" +
+    "   string text = \""+ util.inspect(textSolution).replace(/^'|'$/g, '').replace(/"/g, '\\"') + "\";\n" +
     "   cout << exercise(text);\n" +
     "   return 0;\n" +
   " }";
@@ -22,7 +28,11 @@ function stringBuilder(codeValidation,textSolution,nameFile){
 
 module.exports = {
 
-  execute: function(codeValidation,textSolution, res){
+  execute: function(codeValidation,textSolution, res, server){
+
+    var ssh = new node_ssh();
+
+    console.log("Server: " + server);
 
     var nameFile = shortid.generate();
 
@@ -47,69 +57,102 @@ module.exports = {
 
       var d = Q.defer();
 
-      execFile('g++', ['files/c++/'+ nameFile +'.cpp', '-o' ,'files/c++/'+ nameFile], (err, stdout, stderr) => {
-        if (err){
+                ssh.connect({
+                  host: server,
+                  username: config.user,
+                  password: config.password
 
-          console.log("Borrando archivo: " + nameFile + ".cpp");
-          fs.unlink('./files/c++/'+ nameFile +'.cpp');
-          d.reject(stderr);
-        }else{
+                }).then(function(){
 
-          console.log("Created file: " + nameFile);
+                  var z = Q.defer();
 
-          console.log("Borrando archivo: " + nameFile + ".cpp");
+                  ssh.put(path.dirname(require.main.filename) + '/files/c++/'+ nameFile +'.cpp', 'files/c++/'+ nameFile +'.cpp').then(function() {
+                      console.log('Uploaded file '+nameFile +'.cpp');
+                      z.resolve();
+                  }, function(error) {
 
-          fs.unlink('./files/c++/'+ nameFile +'.cpp');
-          d.resolve();
+                      console.log(error);
+                      z.reject(error);
 
-        }
-      });
+                  });
 
-      return d.promise;
+                  return z.promise;
 
-    }).then(function(){
+                }).then(function(){
 
-      var d = Q.defer();
+                    var z = Q.defer();
 
-      console.log("Executing: " + nameFile);
+                  ssh.execCommand('g++ -std=c++11 files/c++/'+ nameFile +'.cpp -o files/c++/'+ nameFile ,{stream: 'both'}).then(function(result) {
 
-      execFile('./files/c++/'+nameFile , (err, stdout, stderr) => {
-        if (err){
+                    if(result.stderr !== ''){
 
-          console.log("Borrando archivo: " + nameFile);
+                      z.reject(result.stderr);
+                    }else{
+                      console.log("Archivo compilado");
+                      z.resolve();
+                    }
 
-          fs.unlink('./files/c++/'+ nameFile);
+                    });
 
-          d.reject(stderr);
-        }else{
+                  return z.promise;
 
-          console.log("Respuesta: "+ stdout);
+                }).then(function(){
 
-          if(stdout === '1'){
-            stdout = "true";
-          }
+                  var z = Q.defer();
 
-          if(stdout === '0'){
-            stdout = "false";
-          }
+                  ssh.execCommand('./files/c++/'+ nameFile ,{stream: 'both'}).then(function(result) {
+                    if(result.stderr !== ''){
 
-          res.json(JSON.stringify({"respuesta":stdout.trim()}));
+                      z.reject(result.stderr);
 
-          console.log("Borrando archivo: " + nameFile);
+                    }else{
 
-          fs.unlink('./files/c++/'+ nameFile);
+                      if(result.stdout === '1'){
+                          result.stdout = "true";
+                      }
 
+                      if(result.stdout === '0'){
+                          result.stdout = "false";
+                      }
 
-          d.resolve();
+                      console.log("Respuesta: "+ result.stdout);
+                      res.json(JSON.stringify({"respuesta": result.stdout.trim()}));
+                      z.resolve();
+                    }
 
+                  });
 
-       }
-         return d.promise;
+                return z.promise;
 
-      });
+                }).then(function(){
 
-    })
-    .fail(function(error){
+                    var z = Q.defer();
+
+                  ssh.execCommand('rm -f files/c++/'+ nameFile +'.cpp && rm -f files/c++/'+ nameFile).then(function(result) {
+                    console.log('Borrado archivos en el servidor');
+                    console.log('Borrando archivo local');
+                    fs.unlink('./files/c++/'+ nameFile +'.cpp');
+                    z.resolve();
+                    d.resolve();
+                  });
+
+                  return z.promise;
+
+                }).catch(function(e){
+
+                  ssh.execCommand('rm -f files/c++/'+ nameFile +'.cpp && rm -f files/c++/'+ nameFile).then(function(result) {
+                    console.log('Borrado archivos en el servidor');
+                    console.log('Borrando archivo local');
+                    fs.unlink('./files/c++/'+ nameFile +'.cpp');
+                    z.resolve();
+                    d.resolve();
+                  });
+
+                });
+
+        return d.promise;
+
+    }).fail(function(error){
 
       console.log(error);
       res.status(500).send({"respuesta": error});

@@ -1,17 +1,20 @@
 var fs = require('fs');
+var path = require('path');
 var shortid = require('shortid');
 var execFile = require('child_process').execFile;
 var Q = require('q');
+var node_ssh = require('node-ssh');
+var util = require('util');
+var config = require('../config.json');
 
-
-shortid.characters('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$');
+shortid.characters('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-');
 
 function stringBuilder(codeValidation,textSolution,nameFile){
 
   var string = "package files.java;"+
   "class "+nameFile+" {\n"+
   " public static void main(String args[]) {\n"+
-    "   String text = \""+ textSolution + "\";\n" +
+    "   String text = \""+ util.inspect(textSolution).replace(/^'|'$/g, '').replace(/"/g, '\\"') + "\";\n" +
     "   System.out.print(exercise(text));\n"+
   " }\n"+
   codeValidation+ "\n"+
@@ -24,7 +27,11 @@ function stringBuilder(codeValidation,textSolution,nameFile){
 
 module.exports = {
 
-  execute: function(codeValidation,textSolution, res){
+  execute: function(codeValidation,textSolution, res, server){
+
+    var ssh = new node_ssh();
+
+    console.log("Server: " + server);
 
     var nameFile = shortid.generate();
 
@@ -49,59 +56,92 @@ module.exports = {
 
       var d = Q.defer();
 
-      execFile('javac', ['./files/java/'+ nameFile +'.java'], (err, stdout, stderr) => {
-        if (err){
+      ssh.connect({
+        host: server,
+        username: config.user,
+        password: config.password
 
-          console.log("Borrando archivo: " + nameFile + ".java");
+      }).then(function(){
+
+        var z = Q.defer();
+
+        ssh.put(path.dirname(require.main.filename) + '/files/java/'+ nameFile +'.java', 'files/java/'+ nameFile +'.java').then(function() {
+            console.log('Uploaded file '+nameFile +'.java');
+            z.resolve();
+        }, function(error) {
+
+            console.log(error);
+            z.reject(error);
+
+        });
+
+        return z.promise;
+
+      }).then(function(){
+
+          var z = Q.defer();
+
+        ssh.execCommand('javac files/java/'+ nameFile +'.java',{stream: 'both'}).then(function(result) {
+
+          if(result.stderr !== ''){
+
+            z.reject(result.stderr);
+          }else{
+            console.log("Archivo compilado");
+            z.resolve();
+          }
+
+          });
+
+        return z.promise;
+
+      }).then(function(){
+
+        var z = Q.defer();
+
+        ssh.execCommand('java files.java.'+ nameFile ,{stream: 'both'}).then(function(result) {
+          if(result.stderr !== ''){
+
+            z.reject(result.stderr);
+
+          }else{
+
+            console.log("Respuesta: "+ result.stdout);
+            res.json(JSON.stringify({"respuesta": result.stdout.trim()}));
+            z.resolve();
+          }
+
+        });
+
+      return z.promise;
+
+      }).then(function(){
+
+          var z = Q.defer();
+
+        ssh.execCommand('rm -f files/java/'+ nameFile +'.java && rm -f files/java/'+ nameFile +'.class').then(function(result) {
+          console.log('Borrado archivos en el servidor');
+          console.log('Borrando archivo local');
           fs.unlink('./files/java/'+ nameFile +'.java');
-          d.reject(stderr);
-        }else{
-
-          console.log("Created file: " + nameFile + ".class");
-
-          console.log("Borrando archivo: " + nameFile + ".java");
-
-          fs.unlink('./files/java/'+ nameFile +'.java');
+          z.resolve();
           d.resolve();
+        });
 
-        }
+        return z.promise;
+
+      }).catch(function(e){
+
+        ssh.execCommand('rm -f files/java/'+ nameFile +'.java && rm -f files/java/'+ nameFile+ '.class').then(function(result) {
+          console.log('Borrado archivos en el servidor');
+          console.log('Borrando archivo local');
+          fs.unlink('./files/java/'+ nameFile +'.java');
+          z.resolve();
+          d.resolve();
+        });
+
       });
 
-      return d.promise;
-
-    }).then(function(){
-
-      var d = Q.defer();
-
-      console.log("Executing: " + nameFile + ".class");
-
-      execFile('java',['files/java/'+ nameFile], (err, stdout, stderr) => {
-        if (err){
-
-          console.log("Borrando archivo: " + nameFile + ".class");
-
-          fs.unlink('./files/java/'+ nameFile +'.class');
-
-          d.reject(stderr);
-        }else{
-
-          console.log("Respuesta: "+ stdout);
-
-          res.json(JSON.stringify({"respuesta":stdout.trim()}));
-
-          console.log("Borrando archivo: " + nameFile + ".class");
-
-          fs.unlink('./files/java/'+ nameFile +'.class');
-
-
-          d.resolve();
-
-
-       }
-         return d.promise;
-
-      });
-
+        return d.promise;
     })
     .fail(function(error){
 
