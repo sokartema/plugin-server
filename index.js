@@ -2,11 +2,12 @@ var express = require('express');
 var app = express();
 var bodyParser = require('body-parser');
 var loader = require('./loader');
+var config = require('./config.json');
 
 var PORT = 8080;
 
 var selector = 0;
-var pool = ['10.6.128.60','10.6.128.63','10.6.128.68'];
+var pool = config.workers;
 
 app.use(bodyParser.json()); // support json encoded bodies
 app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
@@ -21,7 +22,7 @@ app.post('/', function(req, res) {
 
     var server = pool[selector];
 
-    if(selector === 2)
+    if(selector === pool.length - 1)
       selector = 0;
     else
       selector++;
